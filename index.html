@@ -33,14 +33,17 @@ table{width:100%;border-collapse:collapse}
 .hide{display:none!important}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
 .err{margin-top:10px;color:var(--amber);font-size:13px;background:#fff7ed;border:1px solid #fcd9a8;border-radius:8px;padding:8px 11px}
-.fac{background:#fff;color:#000;font-family:'IBM Plex Sans',sans-serif;padding:28px 30px}
-.fac .brand{font-size:34px;font-weight:700;color:var(--blue);line-height:1}
-.fac .sub{font-size:12px;font-weight:700;margin-top:2px}
-.fbox td{border:1px solid #000;padding:5px 8px;font-size:13px}
-.ltab th{border:1px solid #000;padding:5px 6px;font-size:12px;background:#f2f2f2}
-.ltab td{border:1px solid #000;padding:5px 6px;font-size:13px;height:24px}
-.foot{font-size:11px;margin-top:26px;line-height:1.5}
-@media print{body *{visibility:hidden}#fac,#fac *{visibility:visible}#fac{position:absolute;inset:0;margin:0}.noprint{display:none!important}}
+.fac{background:#fff;color:#000;font-family:'IBM Plex Sans',sans-serif;padding:34px 36px;display:flex;flex-direction:column;min-height:1090px}
+.fac .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--blue);padding-bottom:10px}
+.fac .brand{font-size:36px;font-weight:700;color:var(--blue);line-height:1}
+.fac .sub{font-size:12px;font-weight:700;margin-top:3px;color:#333}
+.fac .tt{font-size:22px;font-weight:700;color:#222;letter-spacing:.08em}
+.fbox td{border:1px solid #000;padding:6px 9px;font-size:13px}
+.ltab th{border:1px solid #000;padding:6px;font-size:12px;background:#eef4fb}
+.ltab td{border:1px solid #000;padding:6px;font-size:13px;height:26px}
+.foot{margin-top:auto;border-top:2px solid var(--blue);padding-top:10px;font-size:11px;line-height:1.6;text-align:center;color:#333}
+@page{size:A4;margin:14mm}
+@media print{body *{visibility:hidden}#fac,#fac *{visibility:visible}#fac{position:absolute;inset:0;margin:0;min-height:auto;padding:0;box-shadow:none;border:none}.foot{position:fixed;left:0;right:0;bottom:0;background:#fff}.noprint{display:none!important}}
 </style>
 </head>
 <body>
@@ -48,7 +51,7 @@ table{width:100%;border-collapse:collapse}
 
   <!-- ====== À CONFIGURER : colle ici l'URL /exec de ton relais Apps Script ====== -->
   <script>
-    const RELAY_URL = "https://script.google.com/macros/s/AKfycbxEHjO88GS4Hj_zm_soQt1gLDquIEa4HTtnLh4WHctxJrBWKOO3HLpR9pMgXxAwMzIj/exec"; // ex: https://script.google.com/macros/s/xxxx/exec
+    const RELAY_URL = "COLLE_TON_URL_EXEC_ICI"; // ex: https://script.google.com/macros/s/xxxx/exec
   </script>
   <!-- =========================================================================== -->
 
@@ -92,6 +95,7 @@ table{width:100%;border-collapse:collapse}
       <div><label class="lbl">ICE</label><input class="inp mono" id="f_ice"></div>
       <div><label class="lbl">Réf BL</label><input class="inp" id="f_ref"></div>
       <div><label class="lbl">Date</label><input class="inp" id="f_date"></div>
+      <div><label class="lbl">Paiement</label><select class="inp" id="f_pay"><option>Espèces</option><option>Chèque</option><option>Virement</option><option>À terme</option></select></div>
     </div>
     <table>
       <thead><tr style="font-size:11px;color:var(--muted);text-transform:uppercase">
@@ -134,10 +138,39 @@ const $ = (id) => document.getElementById(id);
 const fmt = (n) => (Number(n)||0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const todayFR = () => new Date().toLocaleDateString("fr-FR");
 const esc = (s) => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function frenchNumber(n){
+  n=Math.floor(n); if(n===0) return "zéro";
+  const u=["","un","deux","trois","quatre","cinq","six","sept","huit","neuf","dix","onze","douze","treize","quatorze","quinze","seize","dix-sept","dix-huit","dix-neuf"];
+  const t=["","","vingt","trente","quarante","cinquante","soixante"];
+  function b100(x){
+    if(x<20) return u[x];
+    if(x<70){ const d=Math.floor(x/10),r=x%10; if(r===0)return t[d]; if(r===1)return t[d]+" et un"; return t[d]+"-"+u[r]; }
+    if(x<80){ const r=x-60; if(r===11)return "soixante et onze"; return "soixante-"+u[r]; }
+    if(x<90){ const r=x-80; return r===0?"quatre-vingts":"quatre-vingt-"+u[r]; }
+    return "quatre-vingt-"+u[x-80];
+  }
+  function b1000(x){
+    if(x<100) return b100(x);
+    const c=Math.floor(x/100),r=x%100;
+    if(r===0) return c===1?"cent":u[c]+" cents";
+    return (c===1?"cent":u[c]+" cent")+" "+b100(r);
+  }
+  let p=[]; const M=Math.floor(n/1000000); n%=1000000; const K=Math.floor(n/1000); n%=1000;
+  if(M) p.push(M===1?"un million":b1000(M)+" millions");
+  if(K) p.push(K===1?"mille":b1000(K)+" mille");
+  if(n) p.push(b1000(n));
+  return p.join(" ");
+}
+function enLettres(v){
+  v=Math.round(v*100)/100; const dh=Math.floor(v),ct=Math.round((v-dh)*100);
+  let s=frenchNumber(dh)+" dirham"+(dh>1?"s":"");
+  if(ct>0) s+=" et "+frenchNumber(ct)+" centime"+(ct>1?"s":"");
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
 
 let state = { img:null, busy:false, num:null,
   next: Number(localStorage.getItem("tu_next")||117),
-  doc: { client:"", ice:"", ref:"", date: todayFR(), lines:[], bl:0 } };
+  doc: { client:"", ice:"", ref:"", date: todayFR(), lines:[], bl:0, pay:"Espèces" } };
 
 function calc(){ const ttc = state.doc.lines.reduce((s,l)=> s+(Number(l.qte)||0)*(Number(l.pu)||0),0); return {ttc, tva: ttc/6}; }
 function updateCounter(){ const yy=String(new Date().getFullYear()).slice(-2); const el=$("nextN"); if(el && document.activeElement!==el) el.value=state.next; const y=$("yy"); if(y) y.textContent=yy; }
@@ -205,7 +238,7 @@ $("readBtn").onclick = async ()=>{
 function renderEdit(){
   $("edit").classList.remove("hide");
   $("f_client").value=state.doc.client; $("f_ice").value=state.doc.ice;
-  $("f_ref").value=state.doc.ref; $("f_date").value=state.doc.date;
+  $("f_ref").value=state.doc.ref; $("f_date").value=state.doc.date; $("f_pay").value=state.doc.pay||"Espèces";
   const rows=$("rows"); rows.innerHTML="";
   state.doc.lines.forEach((l,i)=>{
     const tr=document.createElement("tr");
@@ -227,6 +260,7 @@ $("f_client").oninput=()=>{ state.doc.client=$("f_client").value; updateTotals()
 $("f_ice").oninput=()=>{ state.doc.ice=$("f_ice").value; };
 $("f_ref").oninput=()=>{ state.doc.ref=$("f_ref").value; };
 $("f_date").oninput=()=>{ state.doc.date=$("f_date").value; };
+$("f_pay").onchange=()=>{ state.doc.pay=$("f_pay").value; };
 $("nextN").oninput=()=>{ const v=parseInt($("nextN").value,10); state.next=(v>0?v:1); localStorage.setItem("tu_next",String(state.next)); };
 function updateTotals(){ const t=calc(); $("tTtc").textContent=fmt(t.ttc); $("tTva").textContent=fmt(t.tva);
   const ok = state.doc.client.trim() && state.doc.lines.some(l=>l.designation && l.qte>0); $("genBtn").disabled=!ok; }
@@ -241,7 +275,10 @@ $("genBtn").onclick=()=>{
   let rows=lines.map(l=>'<tr><td></td><td></td><td style="text-align:center">'+l.qte+'</td><td class="ar">'+esc(l.designation)+'</td><td style="text-align:right" class="mono">'+fmt(l.pu)+'</td><td style="text-align:right" class="mono">'+fmt(l.qte*l.pu)+'</td></tr>').join("");
   for(let i=lines.length;i<6;i++) rows+='<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
   $("fac").innerHTML=
-    '<div class="brand">TOP UNIFORM</div><div class="sub">'+CO.sub+'</div>'+
+    '<div class="head"><div style="display:flex;gap:12px;align-items:center">'+
+      '<svg width="46" height="46" viewBox="0 0 48 48"><path d="M24 3 L42 9 V24 C42 35 34 42 24 45 C14 42 6 35 6 24 V9 Z" fill="#0070C0"/><path d="M16 24 l6 6 l11 -13" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+      '<div><div class="brand">TOP UNIFORM</div><div class="sub">'+CO.sub+'</div></div>'+
+    '</div><div class="tt">FACTURE</div></div>'+
     '<table class="fbox" style="margin-top:18px;width:100%"><tbody>'+
     '<tr><td style="width:45%;font-weight:700">FACTURE N° '+state.num+'</td><td>CLIENT : <span class="ar">'+esc(state.doc.client)+'</span></td></tr>'+
     '<tr><td style="font-weight:700">DATE : '+esc(state.doc.date)+'</td><td>ICE&nbsp;&nbsp;&nbsp;: '+esc(state.doc.ice)+'</td></tr>'+
@@ -251,6 +288,13 @@ $("genBtn").onclick=()=>{
     '<tr><td colspan="4" style="border:none"></td><td style="font-weight:700">PRIX T.TTC</td><td style="text-align:right;font-weight:700" class="mono">'+fmt(t.ttc)+'</td></tr>'+
     '<tr><td colspan="4" style="border:none"></td><td style="font-weight:700">DONT TVA 20%</td><td style="text-align:right" class="mono">'+fmt(t.tva)+'</td></tr>'+
     '</tbody></table>'+
+    '<div style="display:flex;justify-content:space-between;gap:20px;margin-top:18px;align-items:flex-start">'+
+      '<div style="flex:1;font-size:12.5px;line-height:1.5">'+
+        'Arrêtée la présente facture à la somme de :<br><b>'+enLettres(t.ttc)+'.</b>'+
+        '<div style="margin-top:12px">Mode de paiement : <b>'+esc(state.doc.pay||"Espèces")+'</b></div>'+
+      '</div>'+
+      '<div style="width:200px;border:1px solid #000;border-radius:4px;padding:8px 8px 30px;font-size:12px;text-align:center">Cachet &amp; Signature</div>'+
+    '</div>'+
     '<div class="foot"><b>'+CO.addr+'</b><br>'+CO.gsm+'<br>'+CO.legal+'</div>';
   $("facNum").textContent="FACTURE N° "+state.num;
   $("fac").classList.remove("hide"); $("facBar").classList.remove("hide");
@@ -294,7 +338,7 @@ async function exportExcel(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="FACTURE "+state.num+" "+safe+".xlsx"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 $("xlsBtn").onclick=exportExcel;
-$("newBtn").onclick=()=>{ state.doc={client:"",ice:"",ref:"",date:todayFR(),lines:[],bl:0}; state.num=null; state.img=null;
+$("newBtn").onclick=()=>{ state.doc={client:"",ice:"",ref:"",date:todayFR(),lines:[],bl:0,pay:"Espèces"}; state.num=null; state.img=null;
   $("file").value=""; $("edit").classList.add("hide"); hideFacture(); $("blTag").classList.add("hide");
   $("dropTxt").textContent="Prendre une photo / importer"; $("preview").classList.add("hide"); $("dropBox").classList.remove("hide");
   showErr(""); window.scrollTo({top:0,behavior:"smooth"}); };
