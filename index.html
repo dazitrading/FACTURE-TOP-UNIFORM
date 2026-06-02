@@ -56,7 +56,7 @@ table{width:100%;border-collapse:collapse}
       <div style="font-size:24px;font-weight:700;color:var(--blue)">TOP UNIFORM</div>
       <div style="color:var(--muted);font-size:13px">BL manuscrit → Facture TTC</div>
     </div>
-    <span class="tag mono" id="counterTag">Compteur : 00</span>
+    <div class="tag mono" style="gap:4px;align-items:center">Prochaine N°&nbsp;<input id="nextN" type="number" min="1" style="width:62px;border:1px solid #cfe2f7;border-radius:6px;padding:2px 5px;font-family:inherit;font-weight:600;color:var(--blue);text-align:center">-<span id="yy"></span></div>
   </div>
 
   <div id="keyWarn" class="card noprint hide" style="background:#fff7ed;border-color:#fcd9a8">
@@ -134,11 +134,11 @@ const todayFR = () => new Date().toLocaleDateString("fr-FR");
 const esc = (s) => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 let state = { img:null, busy:false, num:null,
-  counter: Number(localStorage.getItem("tu_counter")||0),
+  next: Number(localStorage.getItem("tu_next")||117),
   doc: { client:"", ice:"", ref:"", date: todayFR(), lines:[], bl:0 } };
 
 function calc(){ const ttc = state.doc.lines.reduce((s,l)=> s+(Number(l.qte)||0)*(Number(l.pu)||0),0); return {ttc, tva: ttc/6}; }
-function updateCounter(){ $("counterTag").textContent = "Compteur : " + String(state.counter).padStart(2,"0"); }
+function updateCounter(){ const yy=String(new Date().getFullYear()).slice(-2); const el=$("nextN"); if(el && document.activeElement!==el) el.value=state.next; const y=$("yy"); if(y) y.textContent=yy; }
 function showErr(m){ const e=$("err"); if(!m){e.classList.add("hide");return;} e.textContent=m; e.classList.remove("hide"); }
 
 $("pickBtn").onclick = (e)=>{ e.stopPropagation(); $("file").click(); };
@@ -225,6 +225,7 @@ $("f_client").oninput=()=>{ state.doc.client=$("f_client").value; updateTotals()
 $("f_ice").oninput=()=>{ state.doc.ice=$("f_ice").value; };
 $("f_ref").oninput=()=>{ state.doc.ref=$("f_ref").value; };
 $("f_date").oninput=()=>{ state.doc.date=$("f_date").value; };
+$("nextN").oninput=()=>{ const v=parseInt($("nextN").value,10); state.next=(v>0?v:1); localStorage.setItem("tu_next",String(state.next)); };
 function updateTotals(){ const t=calc(); $("tTtc").textContent=fmt(t.ttc); $("tTva").textContent=fmt(t.tva);
   const ok = state.doc.client.trim() && state.doc.lines.some(l=>l.designation && l.qte>0); $("genBtn").disabled=!ok; }
 $("addLine").onclick=()=>{ state.doc.lines.push({designation:"",qte:1,pu:0}); renderEdit(); };
@@ -232,8 +233,8 @@ $("addBL").onclick=()=>{ state.img=null; $("file").value=""; $("preview").classL
 
 function hideFacture(){ $("fac").classList.add("hide"); $("facBar").classList.add("hide"); }
 $("genBtn").onclick=()=>{
-  const n=state.counter+1, yy=String(new Date().getFullYear()).slice(-2);
-  state.num=("0"+n).slice(-2)+"-"+yy; state.counter=n; localStorage.setItem("tu_counter",String(n)); updateCounter();
+  const n=state.next, yy=String(new Date().getFullYear()).slice(-2);
+  state.num=n+"-"+yy; state.next=n+1; localStorage.setItem("tu_next",String(state.next)); updateCounter();
   const t=calc(); const lines=state.doc.lines.filter(l=>l.designation);
   let rows=lines.map(l=>'<tr><td></td><td></td><td style="text-align:center">'+l.qte+'</td><td class="ar">'+esc(l.designation)+'</td><td style="text-align:right" class="mono">'+fmt(l.pu)+'</td><td style="text-align:right" class="mono">'+fmt(l.qte*l.pu)+'</td></tr>').join("");
   for(let i=lines.length;i<6;i++) rows+='<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
