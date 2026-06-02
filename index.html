@@ -105,7 +105,7 @@ table{width:100%;border-collapse:collapse}
       <div><label class="lbl">ICE</label><input class="inp mono" id="f_ice"></div>
       <div><label class="lbl">Réf BL</label><input class="inp" id="f_ref"></div>
       <div><label class="lbl">Date</label><input class="inp" id="f_date"></div>
-      <div><label class="lbl">Paiement</label><select class="inp" id="f_pay"><option>Espèces</option><option>Chèque</option><option>Virement</option><option>À terme</option></select></div>
+      <div><label class="lbl">Paiement</label><select class="inp" id="f_pay"><option value="">— à préciser —</option><option>Espèces</option><option>Chèque</option><option>Virement</option><option>À terme</option></select></div>
     </div>
     <table>
       <thead><tr style="font-size:11px;color:var(--muted);text-transform:uppercase">
@@ -129,9 +129,9 @@ table{width:100%;border-collapse:collapse}
     <span class="tag mono" id="facNum"></span>
     <div style="display:flex;gap:8px">
       <button class="btn btn-gho" id="newBtn" style="padding:9px 14px">+ Nouvelle</button>
-      <button class="btn btn-gho" id="xlsBtn" style="padding:9px 14px">⬇︎ Excel</button>
-      <button class="btn btn-gho" id="printBtn" style="padding:9px 14px">⬇︎ PDF</button>
-      <button class="btn btn-pri" id="shareBtn" style="padding:9px 16px">📤 Partager</button>
+      <button class="btn btn-pri" id="shareBtn" style="padding:9px 14px">📤 PDF</button>
+      <button class="btn btn-pri" id="xlsBtn" style="padding:9px 14px">📤 Excel</button>
+      <button class="btn btn-gho" id="printBtn" style="padding:9px 14px">🖨️ Imprimer</button>
     </div>
   </div>
   <div id="fac" class="fac card hide"></div>
@@ -182,7 +182,7 @@ function enLettres(v){
 let RELAY = (typeof RELAY_URL!=="undefined" && RELAY_URL && RELAY_URL!=="COLLE_TON_URL_EXEC_ICI") ? RELAY_URL : (localStorage.getItem("tu_relay")||"");
 let state = { img:null, busy:false, num:null,
   next: Number(localStorage.getItem("tu_next")||117),
-  doc: { client:"", ice:"", ref:"", date: todayFR(), lines:[], bl:0, pay:"Espèces" } };
+  doc: { client:"", ice:"", ref:"", date: todayFR(), lines:[], bl:0, pay:"" } };
 
 function calc(){ const ttc = state.doc.lines.reduce((s,l)=> s+(Number(l.qte)||0)*(Number(l.pu)||0),0); return {ttc, tva: ttc/6}; }
 function updateCounter(){ const yy=String(new Date().getFullYear()).slice(-2); const el=$("nextN"); if(el && document.activeElement!==el) el.value=state.next; const y=$("yy"); if(y) y.textContent=yy; }
@@ -252,7 +252,7 @@ $("readBtn").onclick = async ()=>{
 function renderEdit(){
   $("edit").classList.remove("hide");
   $("f_client").value=state.doc.client; $("f_ice").value=state.doc.ice;
-  $("f_ref").value=state.doc.ref; $("f_date").value=state.doc.date; $("f_pay").value=state.doc.pay||"Espèces";
+  $("f_ref").value=state.doc.ref; $("f_date").value=state.doc.date; $("f_pay").value=state.doc.pay||"";
   const rows=$("rows"); rows.innerHTML="";
   state.doc.lines.forEach((l,i)=>{
     const tr=document.createElement("tr");
@@ -305,7 +305,7 @@ $("genBtn").onclick=()=>{
     '<div style="display:flex;justify-content:space-between;gap:20px;margin-top:18px;align-items:flex-start">'+
       '<div style="flex:1;font-size:12.5px;line-height:1.5">'+
         'Arrêtée la présente facture à la somme de :<br><b>'+enLettres(t.ttc)+'.</b>'+
-        '<div style="margin-top:12px">Mode de paiement : <b>'+esc(state.doc.pay||"Espèces")+'</b></div>'+
+        (state.doc.pay ? '<div style="margin-top:12px">Mode de paiement : <b>'+esc(state.doc.pay)+'</b></div>' : '')+
       '</div>'+
       '<div style="width:200px;border:1px solid #000;border-radius:4px;padding:8px 8px 30px;font-size:12px;text-align:center">Cachet &amp; Signature</div>'+
     '</div>'+
@@ -315,7 +315,7 @@ $("genBtn").onclick=()=>{
   setTimeout(()=>$("fac").scrollIntoView({behavior:"smooth"}),50);
 };
 $("printBtn").onclick=()=>window.print();
-async function exportExcel(){
+async function buildExcelBlob(){
   if(typeof ExcelJS==="undefined"){ showErr("Librairie Excel pas encore chargée — réessaie dans 2 s."); return; }
   const t=calc(); const lines=state.doc.lines.filter(l=>l.designation);
   const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet("Facture");
@@ -349,9 +349,23 @@ async function exportExcel(){
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
   const safe=(state.doc.client||"client").replace(/[\\/:*?"<>|]/g,"").trim();
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="FACTURE "+state.num+" "+safe+".xlsx"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  return { blob, name:"FACTURE "+state.num+" "+safe+".xlsx" };
 }
-$("xlsBtn").onclick=exportExcel;
+async function shareExcel(){
+  if(typeof ExcelJS==="undefined"){ alert("Librairie Excel pas encore chargée — réessaie dans 2 secondes."); return; }
+  const btn=$("xlsBtn"); const old=btn.innerHTML; btn.innerHTML='<span class="spin"></span>…'; btn.disabled=true;
+  try{
+    const {blob,name}=await buildExcelBlob();
+    const file=new File([blob],name,{type:blob.type});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:"Facture "+state.num,text:"Facture TOP UNIFORM N° "+state.num});
+    }else{
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    }
+  }catch(e){ if(e && e.name!=="AbortError") alert("Partage Excel impossible : "+(e.message||"erreur")); }
+  finally{ btn.innerHTML=old; btn.disabled=false; }
+}
+$("xlsBtn").onclick=shareExcel;
 async function sharePDF(){
   if(typeof html2canvas==="undefined" || !window.jspdf){ alert("Librairies pas encore chargées — réessaie dans 2 secondes."); return; }
   const btn=$("shareBtn"); const old=btn.innerHTML; btn.innerHTML='<span class="spin"></span>Préparation…'; btn.disabled=true;
@@ -380,7 +394,7 @@ async function sharePDF(){
   finally{ btn.innerHTML=old; btn.disabled=false; }
 }
 $("shareBtn").onclick=sharePDF;
-$("newBtn").onclick=()=>{ state.doc={client:"",ice:"",ref:"",date:todayFR(),lines:[],bl:0,pay:"Espèces"}; state.num=null; state.img=null;
+$("newBtn").onclick=()=>{ state.doc={client:"",ice:"",ref:"",date:todayFR(),lines:[],bl:0,pay:""}; state.num=null; state.img=null;
   $("file").value=""; $("edit").classList.add("hide"); hideFacture(); $("blTag").classList.add("hide");
   $("dropTxt").textContent="Prendre une photo / importer"; $("preview").classList.add("hide"); $("dropBox").classList.remove("hide");
   showErr(""); window.scrollTo({top:0,behavior:"smooth"}); };
