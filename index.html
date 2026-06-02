@@ -351,18 +351,20 @@ async function buildExcelBlob(){
   const safe=(state.doc.client||"client").replace(/[\\/:*?"<>|]/g,"").trim();
   return { blob, name:"FACTURE "+state.num+" "+safe+".xlsx" };
 }
+async function shareOrDownload(blob,name){
+  const file=new File([blob],name,{type:blob.type});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file],title:"Facture "+state.num,text:"Facture TOP UNIFORM N° "+state.num}); return; }
+    catch(err){ if(err && err.name==="AbortError") return; /* partage refusé -> on télécharge */ }
+  }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  showErr("Partage direct refusé par le navigateur — le fichier a été téléchargé. Joins-le à WhatsApp/Gmail.");
+}
 async function shareExcel(){
   if(typeof ExcelJS==="undefined"){ alert("Librairie Excel pas encore chargée — réessaie dans 2 secondes."); return; }
   const btn=$("xlsBtn"); const old=btn.innerHTML; btn.innerHTML='<span class="spin"></span>…'; btn.disabled=true;
-  try{
-    const {blob,name}=await buildExcelBlob();
-    const file=new File([blob],name,{type:blob.type});
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file],title:"Facture "+state.num,text:"Facture TOP UNIFORM N° "+state.num});
-    }else{
-      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-    }
-  }catch(e){ if(e && e.name!=="AbortError") alert("Partage Excel impossible : "+(e.message||"erreur")); }
+  try{ const {blob,name}=await buildExcelBlob(); await shareOrDownload(blob,name); }
+  catch(e){ alert("Excel impossible : "+(e.message||"erreur")); }
   finally{ btn.innerHTML=old; btn.disabled=false; }
 }
 $("xlsBtn").onclick=shareExcel;
@@ -383,14 +385,8 @@ async function sharePDF(){
     pdf.addImage(img,"JPEG",(pw-w)/2,0,w,h);
     const blob=pdf.output("blob");
     const safe=(state.doc.client||"client").replace(/[\\/:*?"<>|]/g,"").trim();
-    const file=new File([blob],"FACTURE "+state.num+" "+safe+".pdf",{type:"application/pdf"});
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file],title:"Facture "+state.num,text:"Facture TOP UNIFORM N° "+state.num});
-    }else{
-      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=file.name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-      alert("Partage direct indisponible sur cet appareil — le PDF a été téléchargé. Tu peux le joindre à un email ou l'envoyer sur WhatsApp.");
-    }
-  }catch(e){ if(e && e.name!=="AbortError") alert("Partage impossible : "+(e.message||"erreur")); }
+    await shareOrDownload(blob,"FACTURE "+state.num+" "+safe+".pdf");
+  }catch(e){ alert("PDF impossible : "+(e.message||"erreur")); }
   finally{ btn.innerHTML=old; btn.disabled=false; }
 }
 $("shareBtn").onclick=sharePDF;
