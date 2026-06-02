@@ -54,8 +54,6 @@ table{width:100%;border-collapse:collapse}
   <!-- ====== À CONFIGURER : colle ici l'URL /exec de ton relais Apps Script ====== -->
   <script>
     const RELAY_URL = "https://script.google.com/macros/s/AKfycbxEHjO88GS4Hj_zm_soQt1gLDquIEa4HTtnLh4WHctxJrBWKOO3HLpR9pMgXxAwMzIj/exec"; // ex: https://script.google.com/macros/s/xxxx/exec
-
-"; // ex: https://script.google.com/macros/s/xxxx/exec
   </script>
   <!-- =========================================================================== -->
 
@@ -68,7 +66,11 @@ table{width:100%;border-collapse:collapse}
   </div>
 
   <div id="keyWarn" class="card noprint hide" style="background:#fff7ed;border-color:#fcd9a8">
-    ⚠️ Relais non configuré. Ouvre <b>index.html</b> et colle l'URL <span class="mono">/exec</span> dans <span class="mono">RELAY_URL</span>.
+    <div style="font-size:13px;margin-bottom:8px">⚙️ Colle ici ton URL du relais (Apps Script <span class="mono">/exec</span>) — elle sera mémorisée sur cet appareil :</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input class="inp mono" id="relayInput" placeholder="https://script.google.com/macros/s/..../exec" style="flex:1;min-width:200px">
+      <button class="btn btn-pri" id="relaySave" style="padding:9px 16px">Enregistrer</button>
+    </div>
   </div>
 
   <div id="photo" class="card noprint">
@@ -177,6 +179,7 @@ function enLettres(v){
   return s.charAt(0).toUpperCase()+s.slice(1);
 }
 
+let RELAY = (typeof RELAY_URL!=="undefined" && RELAY_URL && RELAY_URL!=="COLLE_TON_URL_EXEC_ICI") ? RELAY_URL : (localStorage.getItem("tu_relay")||"");
 let state = { img:null, busy:false, num:null,
   next: Number(localStorage.getItem("tu_next")||117),
   doc: { client:"", ice:"", ref:"", date: todayFR(), lines:[], bl:0, pay:"Espèces" } };
@@ -213,11 +216,11 @@ $("fileCam").onchange = $("file").onchange;
 
 $("readBtn").onclick = async ()=>{
   if(!state.img || state.busy) return;
-  if(!RELAY_URL || RELAY_URL==="COLLE_TON_URL_EXEC_ICI"){ $("keyWarn").classList.remove("hide"); showErr("Configure l'URL du relais dans le fichier."); return; }
+  if(!RELAY){ $("keyWarn").classList.remove("hide"); showErr("Colle ton URL de relais en haut, puis Enregistrer."); $("keyWarn").scrollIntoView({behavior:"smooth"}); return; }
   state.busy=true; $("readBtn").innerHTML='<span class="spin"></span>Lecture…'; showErr("");
   try{
     const ctrl=new AbortController(); const timer=setTimeout(()=>ctrl.abort(),75000);
-    const res=await fetch(RELAY_URL,{
+    const res=await fetch(RELAY,{
       method:"POST", signal:ctrl.signal,
       headers:{ "Content-Type":"text/plain;charset=utf-8" },
       body: JSON.stringify({ img:{ data:state.img.data, mime:state.img.mime } })
@@ -378,7 +381,8 @@ $("newBtn").onclick=()=>{ state.doc={client:"",ice:"",ref:"",date:todayFR(),line
   showErr(""); window.scrollTo({top:0,behavior:"smooth"}); };
 
 updateCounter();
-if(!RELAY_URL || RELAY_URL==="COLLE_TON_URL_EXEC_ICI") $("keyWarn").classList.remove("hide");
+$("relaySave").onclick=()=>{ const v=($("relayInput").value||"").trim(); if(!/^https:\/\/.+\/exec$/.test(v)){ alert("URL invalide : elle doit commencer par https:// et finir par /exec"); return; } RELAY=v; localStorage.setItem("tu_relay",v); $("keyWarn").classList.add("hide"); showErr(""); };
+if(!RELAY) $("keyWarn").classList.remove("hide"); else { const ri=$("relayInput"); if(ri) ri.value=RELAY; }
 </script>
 </body>
 </html>
