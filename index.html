@@ -343,9 +343,16 @@ async function buildExcelBlob(){
   ws.getCell(r,6).value={formula:"SUM(F"+first+":F"+last+")",result:t.ttc}; ws.getCell(r,6).font={bold:true}; ws.getCell(r,6).numFmt="#,##0.00"; ws.getCell(r,6).border=bd; r++;
   ws.getCell(r,5).value="DONT TVA 20%"; ws.getCell(r,5).font={bold:true}; ws.getCell(r,5).border=bd;
   ws.getCell(r,6).value={formula:"F"+rTtc+"/6",result:t.tva}; ws.getCell(r,6).numFmt="#,##0.00"; ws.getCell(r,6).border=bd; r+=2;
-  ws.mergeCells("A"+r+":F"+r); ws.getCell(r,1).value=CO.addr; ws.getCell(r,1).font={bold:true,size:9}; r++;
-  ws.mergeCells("A"+r+":F"+r); ws.getCell(r,1).value=CO.gsm; ws.getCell(r,1).font={size:9}; r++;
-  ws.mergeCells("A"+r+":F"+r); ws.getCell(r,1).value=CO.legal; ws.getCell(r,1).font={size:9};
+  // Montant en lettres
+  ws.mergeCells("A"+r+":F"+r); ws.getCell(r,1).value="Arrêtée la présente facture à la somme de : "+enLettres(t.ttc)+"."; ws.getCell(r,1).font={italic:true,size:11}; r++;
+  // Mode de paiement (si renseigné)
+  if(state.doc.pay){ ws.mergeCells("A"+r+":C"+r); ws.getCell(r,1).value="Mode de paiement : "+state.doc.pay; ws.getCell(r,1).font={bold:true,size:11}; }
+  // Case Cachet & Signature (à droite)
+  const rCachet=r; ws.mergeCells("E"+r+":F"+(r+3)); const cc=ws.getCell(r,5); cc.value="Cachet & Signature"; cc.alignment={horizontal:"center",vertical:"top"}; cc.font={size:10}; cc.border=bd;
+  r=rCachet+5;
+  // Mise en page A4 + footer en bas de page (s'imprime en bas, comme le PDF)
+  ws.pageSetup={ paperSize:9, orientation:"portrait", fitToPage:true, fitToWidth:1, fitToHeight:1, margins:{left:0.4,right:0.4,top:0.5,bottom:0.8,header:0.2,footer:0.4} };
+  ws.headerFooter={ oddFooter:"&C&9"+CO.addr+"\n"+CO.gsm+"\n"+CO.legal };
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
   const safe=(state.doc.client||"client").replace(/[\\/:*?"<>|]/g,"").trim();
