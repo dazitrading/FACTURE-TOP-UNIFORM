@@ -357,11 +357,16 @@ async function sharePDF(){
   const btn=$("shareBtn"); const old=btn.innerHTML; btn.innerHTML='<span class="spin"></span>Préparation…'; btn.disabled=true;
   try{
     const node=$("fac");
-    const canvas=await html2canvas(node,{scale:2,backgroundColor:"#ffffff",useCORS:true});
+    const pv=node.style.width, pmw=node.style.maxWidth;
+    node.style.width="794px"; node.style.maxWidth="794px";
+    const canvas=await html2canvas(node,{scale:2,backgroundColor:"#ffffff",useCORS:true,windowWidth:900});
+    node.style.width=pv; node.style.maxWidth=pmw;
     const img=canvas.toDataURL("image/jpeg",0.95);
     const {jsPDF}=window.jspdf; const pdf=new jsPDF("p","mm","a4");
-    const pw=pdf.internal.pageSize.getWidth(); const imgH=canvas.height*pw/canvas.width;
-    pdf.addImage(img,"JPEG",0,0,pw,imgH);
+    const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+    let w=pw, h=canvas.height*pw/canvas.width;
+    if(h>ph){ h=ph; w=canvas.width*ph/canvas.height; }
+    pdf.addImage(img,"JPEG",(pw-w)/2,0,w,h);
     const blob=pdf.output("blob");
     const safe=(state.doc.client||"client").replace(/[\\/:*?"<>|]/g,"").trim();
     const file=new File([blob],"FACTURE "+state.num+" "+safe+".pdf",{type:"application/pdf"});
