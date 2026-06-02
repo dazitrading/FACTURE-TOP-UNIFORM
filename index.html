@@ -8,6 +8,8 @@
 <meta name="theme-color" content="#0070C0">
 <title>Factures TOP UNIFORM</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
 :root{--ink:#0b1f3a;--blue:#0070C0;--line:#dfe4ee;--muted:#6b7895;--amber:#b45309}
@@ -51,7 +53,7 @@ table{width:100%;border-collapse:collapse}
 
   <!-- ====== À CONFIGURER : colle ici l'URL /exec de ton relais Apps Script ====== -->
   <script>
-    const RELAY_URL = "https://script.google.com/macros/s/AKfycbxEHjO88GS4Hj_zm_soQt1gLDquIEa4HTtnLh4WHctxJrBWKOO3HLpR9pMgXxAwMzIj/exec"; // ex: https://script.google.com/macros/s/xxxx/exec
+    const RELAY_URL = "COLLE_TON_URL_EXEC_ICI"; // ex: https://script.google.com/macros/s/xxxx/exec
   </script>
   <!-- =========================================================================== -->
 
@@ -124,7 +126,8 @@ table{width:100%;border-collapse:collapse}
     <div style="display:flex;gap:8px">
       <button class="btn btn-gho" id="newBtn" style="padding:9px 14px">+ Nouvelle</button>
       <button class="btn btn-gho" id="xlsBtn" style="padding:9px 14px">⬇︎ Excel</button>
-      <button class="btn btn-pri" id="printBtn" style="padding:9px 16px">⬇︎ PDF</button>
+      <button class="btn btn-gho" id="printBtn" style="padding:9px 14px">⬇︎ PDF</button>
+      <button class="btn btn-pri" id="shareBtn" style="padding:9px 16px">📤 Partager</button>
     </div>
   </div>
   <div id="fac" class="fac card hide"></div>
@@ -344,6 +347,29 @@ async function exportExcel(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="FACTURE "+state.num+" "+safe+".xlsx"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 $("xlsBtn").onclick=exportExcel;
+async function sharePDF(){
+  if(typeof html2canvas==="undefined" || !window.jspdf){ alert("Librairies pas encore chargées — réessaie dans 2 secondes."); return; }
+  const btn=$("shareBtn"); const old=btn.innerHTML; btn.innerHTML='<span class="spin"></span>Préparation…'; btn.disabled=true;
+  try{
+    const node=$("fac");
+    const canvas=await html2canvas(node,{scale:2,backgroundColor:"#ffffff",useCORS:true});
+    const img=canvas.toDataURL("image/jpeg",0.95);
+    const {jsPDF}=window.jspdf; const pdf=new jsPDF("p","mm","a4");
+    const pw=pdf.internal.pageSize.getWidth(); const imgH=canvas.height*pw/canvas.width;
+    pdf.addImage(img,"JPEG",0,0,pw,imgH);
+    const blob=pdf.output("blob");
+    const safe=(state.doc.client||"client").replace(/[\\/:*?"<>|]/g,"").trim();
+    const file=new File([blob],"FACTURE "+state.num+" "+safe+".pdf",{type:"application/pdf"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:"Facture "+state.num,text:"Facture TOP UNIFORM N° "+state.num});
+    }else{
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=file.name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+      alert("Partage direct indisponible sur cet appareil — le PDF a été téléchargé. Tu peux le joindre à un email ou l'envoyer sur WhatsApp.");
+    }
+  }catch(e){ if(e && e.name!=="AbortError") alert("Partage impossible : "+(e.message||"erreur")); }
+  finally{ btn.innerHTML=old; btn.disabled=false; }
+}
+$("shareBtn").onclick=sharePDF;
 $("newBtn").onclick=()=>{ state.doc={client:"",ice:"",ref:"",date:todayFR(),lines:[],bl:0,pay:"Espèces"}; state.num=null; state.img=null;
   $("file").value=""; $("edit").classList.add("hide"); hideFacture(); $("blTag").classList.add("hide");
   $("dropTxt").textContent="Prendre une photo / importer"; $("preview").classList.add("hide"); $("dropBox").classList.remove("hide");
